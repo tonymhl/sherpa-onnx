@@ -1,0 +1,158 @@
+=============================================================================
+  Sherpa-ONNX TTS Docker 离线部署快速参考
+  版本: 1.0.0 | 更新: 2024-10-21
+=============================================================================
+
+## 一、Windows 构建（5-10分钟）
+
+1. 准备文件
+   - vits-melo-tts-zh_en/      (模型目录)
+   - python-packages/          (依赖包)
+   - Dockerfile
+   - docker-compose.yml
+   - tts_service.py
+   - build_docker_image.py
+
+2. 下载依赖（如果还没有）
+   pip download sherpa-onnx soundfile flask flask-cors waitress -d python-packages
+
+3. 构建和导出镜像
+   python build_docker_image.py
+
+   # 或手动执行
+   docker build -t sherpa-onnx-tts:latest .
+   docker save -o sherpa-onnx-tts-image.tar sherpa-onnx-tts:latest
+
+4. 得到部署包
+   docker-deployment-YYYYMMDD_HHMMSS/
+   ├── sherpa-onnx-tts-image-YYYYMMDD_HHMMSS.tar  (~1.2GB)
+   ├── docker-compose.yml
+   ├── deploy_centos_docker.sh
+   ├── Docker部署指南.md
+   └── README.txt
+
+## 二、传输到 CentOS
+
+方法A: SCP（有网络）
+   scp -r docker-deployment-* user@server:/opt/
+
+方法B: U盘（离线）
+   1. 复制部署包到 U盘
+   2. 在 CentOS 挂载 U盘并复制到 /opt/
+
+## 三、CentOS 部署（5分钟）
+
+1. 进入部署目录
+   cd /opt/docker-deployment-YYYYMMDD_HHMMSS
+
+2. 运行部署脚本
+   chmod +x deploy_centos_docker.sh
+   sudo ./deploy_centos_docker.sh
+
+3. 完成！
+   服务运行在: http://server-ip:5000
+
+## 四、API 使用示例
+
+# 健康检查
+curl http://server-ip:5000/health
+
+# 生成中文语音
+curl -X POST http://server-ip:5000/api/tts/stream \
+  -H "Content-Type: application/json" \
+  -d '{"text": "你好世界"}' \
+  -o output.wav
+
+# 生成英文语音
+curl -X POST http://server-ip:5000/api/tts/stream \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello World"}' \
+  -o output.wav
+
+# 中英混合
+curl -X POST http://server-ip:5000/api/tts/stream \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello大家好"}' \
+  -o output.wav
+
+## 五、服务管理
+
+# 查看状态
+sudo docker ps
+
+# 查看日志
+sudo docker-compose logs -f
+
+# 停止服务
+sudo docker-compose stop
+
+# 启动服务
+sudo docker-compose start
+
+# 重启服务
+sudo docker-compose restart
+
+# 删除服务
+sudo docker-compose down
+
+## 六、故障排除
+
+问题: 容器启动失败
+  sudo docker-compose logs
+
+问题: 端口被占用
+  sudo netstat -tulpn | grep 5000
+  # 修改 docker-compose.yml 中的端口
+
+问题: 健康检查失败
+  sudo docker logs sherpa-onnx-tts-service
+  curl http://localhost:5000/health
+
+问题: 性能慢 (RTF > 1.0)
+  # 增加 docker-compose.yml 中的 NUM_THREADS
+
+## 七、文件清单
+
+必需文件:
+  ✓ sherpa-onnx-tts-image-*.tar    (Docker 镜像)
+  ✓ docker-compose.yml              (服务配置)
+  ✓ deploy_centos_docker.sh         (部署脚本)
+
+参考文档:
+  ✓ Docker部署指南.md               (完整文档)
+  ✓ Docker部署快速参考.txt          (本文件)
+  ✓ README.txt                      (快速开始)
+
+## 八、技术规格
+
+镜像大小:    ~1.2 GB
+内存需求:    2-4 GB
+CPU线程:     4 (可调整)
+端口:        5000
+协议:        HTTP REST API
+格式:        WAV (44.1kHz, 16-bit PCM)
+支持语言:    中文、英文、中英混合
+最大文本:    500 字符 (可调整)
+语速范围:    0.5x - 2.0x
+
+## 九、性能参考
+
+设备类型          CPU              RTF      评价
+---------------------------------------------------
+笔记本           Intel i5          0.10     良好
+标准服务器       Intel Xeon        0.05     优秀
+虚拟机 (4核)     任意              0.15     可接受
+Raspberry Pi 4   Cortex-A72        0.30     慢
+
+RTF < 1.0 = 可实时合成
+
+## 十、支持资源
+
+完整文档:  Docker部署指南.md
+官方文档:  https://k2-fsa.github.io/sherpa/onnx/tts/
+GitHub:    https://github.com/k2-fsa/sherpa-onnx
+
+=============================================================================
+快速参考结束 | 详细信息请查看 Docker部署指南.md
+=============================================================================
+

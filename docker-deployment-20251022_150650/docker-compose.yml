@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  sherpa-onnx-tts:
+    image: sherpa-onnx-tts:latest
+    container_name: sherpa-onnx-tts-service
+    restart: unless-stopped
+    
+    ports:
+      - "5000:5000"  # TTS API 端口
+    
+    volumes:
+      # 持久化输出目录
+      - ./output:/app/output
+      # 持久化日志
+      - ./logs:/app/logs
+    
+    environment:
+      # 模型配置
+      - MODEL_DIR=/app/models/vits-melo-tts-zh_en
+      - NUM_THREADS=4
+      - MAX_TEXT_LENGTH=500
+      
+      # 服务配置
+      - FLASK_ENV=production
+      - LOG_LEVEL=INFO
+      - MAX_WORKERS=4
+    
+    # 资源限制（根据服务器配置调整）
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '2.0'
+          memory: 2G
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# 网络配置
+networks:
+  default:
+    name: sherpa-onnx-network
+

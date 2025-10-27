@@ -156,3 +156,6 @@ am.mvn
 *bpe.model
 config.yaml
 configuration.json
+*.tar
+*.whl
+*.png

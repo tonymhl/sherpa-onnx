@@ -1,0 +1,222 @@
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  Sherpa-ONNX TTS 资源扩容快速参考                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+📊 配置方案对比
+══════════════════════════════════════════════════════════════
+
+┌─────────────┬─────────┬────────┬──────────┬──────────────┐
+│   方案      │  CPU    │  内存  │  适用QPS │  性能提升    │
+├─────────────┼─────────┼────────┼──────────┼──────────────┤
+│ 当前配置    │  4核    │  4GB   │  < 10    │  -           │
+│ 中等配置 ⭐  │  6核    │  6GB   │  10-20   │  +50%        │
+│ 高配配置 ⭐⭐ │  8核    │  8GB   │  20-40   │  +100%       │
+│ 极高配置    │  16核   │  16GB  │  40-80   │  +300%       │
+└─────────────┴─────────┴────────┴──────────┴──────────────┘
+
+
+🎯 推荐选择
+══════════════════════════════════════════════════════════════
+
+当前问题                推荐方案        资源申请
+───────────────────────────────────────────────────────────
+偶尔卡顿                6核6G          CPU +2核, 内存 +2G
+频繁卡顿                8核8G ⭐       CPU +4核, 内存 +4G
+严重延迟                16核16G        CPU +12核, 内存 +12G
+高峰期卡顿              8核8G ⭐       CPU +4核, 内存 +4G
+
+
+🚀 热更新步骤（3步完成）
+══════════════════════════════════════════════════════════════
+
+方法 1: 使用自动化脚本（推荐）
+────────────────────────────────────────────────
+cd /home/app/sherpa-onnx-deploy/docker-deployment-<timestamp>
+
+# 升级到 8核8G（推荐）
+chmod +x 热更新到8核8G.sh
+./热更新到8核8G.sh
+
+# 服务中断时间 < 5秒
+# 全自动完成，包括备份、更新、验证
+
+
+方法 2: 手动热更新
+────────────────────────────────────────────────
+# 1. 备份当前配置
+cp docker-compose.yml docker-compose.yml.backup
+
+# 2. 选择配置方案（选一个）
+cp docker-compose-中配6核6G.yml docker-compose.yml     # 6核6G
+cp docker-compose-高配8核8G.yml docker-compose.yml     # 8核8G ⭐
+cp docker-compose-高配16核16G.yml docker-compose.yml   # 16核16G
+
+# 3. 热更新
+sudo docker-compose up -d
+
+# 4. 验证
+sudo docker stats sherpa-onnx-tts-service --no-stream
+
+
+方法 3: Docker 直接更新（仅限资源限制）
+────────────────────────────────────────────────
+# 更新到 8核8G
+sudo docker update --cpus="8.0" --memory="8g" sherpa-onnx-tts-service
+
+# 验证
+sudo docker inspect sherpa-onnx-tts-service | grep -A 5 "Resources"
+
+⚠️  此方法不更新环境变量，建议使用方法1或2
+
+
+📈 验证更新是否成功
+══════════════════════════════════════════════════════════════
+
+# 1. 查看资源使用
+sudo docker stats sherpa-onnx-tts-service --no-stream
+
+# 2. 查看环境变量
+sudo docker exec sherpa-onnx-tts-service printenv | grep -E "NUM_THREADS|MAX_WORKERS"
+
+# 3. 健康检查
+curl http://localhost:5000/health
+
+# 4. 性能测试
+time curl -X POST http://localhost:5000/api/tts/stream \
+  -H "Content-Type: application/json" \
+  -d '{"text": "升级后性能测试"}' \
+  -o /tmp/test.wav
+
+
+🔍 问题诊断
+══════════════════════════════════════════════════════════════
+
+问题                     检查命令                         解决方案
+───────────────────────────────────────────────────────────────────
+CPU 占用高               docker stats                    升级 CPU
+内存不足                 docker stats                    升级内存
+延迟大                   docker-compose logs -f          检查日志
+连接数过多               netstat -an | grep :5000        增加 workers
+更新未生效               docker exec ... printenv        重新创建容器
+
+
+🛡️ 回滚操作
+══════════════════════════════════════════════════════════════
+
+如果更新后出现问题：
+
+# 恢复备份配置
+cp docker-compose.yml.backup docker-compose.yml
+
+# 重启服务
+sudo docker-compose up -d
+
+# 验证
+curl http://localhost:5000/health
+
+
+📊 性能监控
+══════════════════════════════════════════════════════════════
+
+# 实时监控（持续显示）
+sudo docker stats sherpa-onnx-tts-service
+
+# 查看日志
+sudo docker-compose logs -f
+
+# 查看最近错误
+sudo docker-compose logs --tail=50 | grep -i error
+
+# 查看服务信息
+curl http://localhost:5000/api/info
+
+
+💡 常用命令
+══════════════════════════════════════════════════════════════
+
+# 重启服务
+sudo docker-compose restart
+
+# 停止服务
+sudo docker-compose stop
+
+# 启动服务
+sudo docker-compose start
+
+# 查看容器状态
+sudo docker ps | grep sherpa-onnx
+
+# 查看完整配置
+sudo docker inspect sherpa-onnx-tts-service
+
+
+📝 IT 资源申请模板
+══════════════════════════════════════════════════════════════
+
+主题：TTS 服务器资源扩容申请（紧急）
+
+申请内容：
+  服务器 IP: 10.80.127.51
+  当前配置: 4核4G
+  目标配置: 8核8G
+  扩容资源: CPU +4核, 内存 +4G
+
+申请理由：
+  1. CPU 使用率峰值达 95%
+  2. 响应延迟从 0.5秒增加到 2-3秒
+  3. 影响小智智控台语音合成功能
+
+预期效果：
+  - 吞吐量提升 100%
+  - 延迟降低 50%
+  - 支持 QPS 提升到 20-40
+
+热更新方案：
+  使用 Docker Compose 热更新，服务中断 < 5秒
+
+
+⚡ 紧急热更新（单行命令）
+══════════════════════════════════════════════════════════════
+
+# 一键升级到 8核8G（推荐）
+cd /home/app/sherpa-onnx-deploy/docker-deployment-* && \
+cp docker-compose.yml docker-compose.yml.backup && \
+cp docker-compose-高配8核8G.yml docker-compose.yml && \
+sudo docker-compose up -d && \
+sleep 30 && \
+curl http://localhost:5000/health
+
+
+📞 技术支持
+══════════════════════════════════════════════════════════════
+
+详细文档: 资源扩容和热更新指南.md
+配置文件: docker-compose-*.yml
+自动脚本: 热更新到8核8G.sh
+
+
+✅ 推荐执行步骤（3分钟完成）
+══════════════════════════════════════════════════════════════
+
+1️⃣  SSH 登录服务器
+   ssh user@10.80.127.51
+
+2️⃣  进入部署目录
+   cd /home/app/sherpa-onnx-deploy/docker-deployment-*
+
+3️⃣  执行热更新脚本
+   chmod +x 热更新到8核8G.sh
+   ./热更新到8核8G.sh
+
+4️⃣  验证效果
+   sudo docker stats sherpa-onnx-tts-service
+   curl http://localhost:5000/health
+
+✅ 完成！
+
+
+══════════════════════════════════════════════════════════════
+版本: v1.0
+更新时间: 2025-10-22
+状态: ✅ 可立即执行
+
